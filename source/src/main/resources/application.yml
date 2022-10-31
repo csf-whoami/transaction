@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    driverClassName: org.postgresql.Driver
+    url: jdbc:postgresql://csf_postgres:5432/postgres
+    username: csf
+    password: Y3NmLXRlYW0
+    hikari:
+      connection-timeout: 30000
+      validation-timeout: 10000
+      maximum-pool-size: 50
+      minimum-idle: 30
+      max-lifetime: 60000
+  liquibase:
+    change-log: classpath:db/liquibase/master.xml
+    defaultSchema: public

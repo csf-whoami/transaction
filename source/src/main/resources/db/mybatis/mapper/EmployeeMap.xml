@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//ibatis.apache.org//DTD Mapper 3.0//EN" "http://ibatis.apache.org/dtd/ibatis-3-mapper.dtd">
+
+<mapper namespace="com.csf.training.mybatis.transaction.mapper.EmployeeMapper">
+	<select id="selectEmployeeById" resultType="Employee" parameterType="String">
+		select *
+		from tb_employee
+		where uuid = #{uuid}
+		FOR UPDATE
+	</select>
+
+	<update id="updateEmployeeInfo" parameterType="Employee">
+		UPDATE tb_employee SET
+        <if test="name != null and name != ''">
+			name= #{name}
+		</if>
+
+		<if test="dept != null and dept != '' and start == 2">
+			dept= #{dept}
+		</if>
+		<if test="dept != null and dept != '' and start == 1">
+			, dept= #{dept}
+		</if>
+
+		<if test="phone != null and phone != '' and start == 3">
+			phone= #{phone}
+		</if>
+		<if test="phone != null and phone != '' and (start == 1 or start == 2)">
+			, phone= #{phone}
+		</if>
+
+		<if test="address != null and address != '' and start == 4">
+			address= #{address}
+		</if>
+		<if test="address != null and address != '' and (start == 1 and start == 2 or start == 3)">
+			, address= #{address}
+		</if>
+	</update>
+</mapper>
