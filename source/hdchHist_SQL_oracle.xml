@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hdchHist">
+	<insert id="saveHdchHist" parameterType="zvl">
+		<selectKey resultType="long" order="BEFORE" keyProperty="hdchHistNo">
+			SELECT NVL(MAX(HDCH_HIST_NO),0)+1 FROM TK_HDCH_HIST
+		</selectKey>
+		<![CDATA[
+		/*saveHdchHist*/
+		/*소장이력 등록*/
+		INSERT
+		INTO   TK_HDCH_HIST(
+              HDCH_HIST_NO,
+              HDCH_HIST_ID,
+              HDCH_HIST_NM,
+              HDCH_HIST_TY_CD,
+              ADRES1,
+              ADRES2,
+              DETAIL_ADRES,
+              HDCH_BGNDE,
+              HDCH_ENDDE,
+			  PRSMP_ERA_DT,
+              ORIGIN_ID,
+              HDCH_HIST_NM_EN,
+              DETAIL_ADRES_EN
+              )
+       VALUES(
+              #{hdchHistNo},
+              #{hdchHistId},
+              #{hdchHistNm},
+              #{hdchHistTyCd},
+              #{adres1},
+              #{adres2},
+              #{detailAdres},
+              #{hdchBgnde},
+              #{hdchEndde},
+              #{prsmpEraDt},
+              #{originId},
+              #{hdchHistNmEn},
+              #{detailAdresEn}
+              )
+
+		]]>
+	</insert>
+	
+	<update id="updateHdchHist" parameterType="zvl">
+		<![CDATA[
+			/*updateHdchHist*/
+			/*소장이력 수정 */
+			UPDATE TK_HDCH_HIST
+			SET	   HDCH_HIST_NM = #{hdchHistNm},
+				   HDCH_HIST_NM_EN = #{hdchHistNmEn},
+				   HDCH_HIST_TY_CD = #{hdchHistTyCd},
+				   ADRES1 = #{adres1},
+				   ADRES2 = #{adres2},
+				   DETAIL_ADRES = #{detailAdres},
+				   DETAIL_ADRES_EN = #{detailAdresEn},
+				   HDCH_BGNDE = #{hdchBgnde},
+              	   HDCH_ENDDE = #{hdchEndde},
+              	   PRSMP_ERA_DT = #{prsmpEraDt},
+              	   ORIGIN_ID = #{originId}
+			WHERE  HDCH_HIST_ID = #{hdchHistId}
+			AND    HDCH_HIST_NO = #{hdchHistNo}
+		]]>
+	</update>
+	
+	<select id="findALLHdchHist" parameterType="zvl" resultType="zvl">
+		<![CDATA[
+		/*findALLHdchHist*/
+		/*소장이력 리스트 */
+		SELECT A.*
+		,(SELECT DD.CD_NM FROM TC_CMMN_CD_DETAIL DD WHERE DD.CD_ID = 'HDCH_HIST_TY_CD' AND DD.CD = A.HDCH_HIST_TY_CD) AS HDCH_HIST_TY_CD_NM
+		,(SELECT DD.CD_ENG_NM FROM TC_CMMN_CD_DETAIL DD WHERE DD.CD_ID = 'HDCH_HIST_TY_CD' AND DD.CD = A.HDCH_HIST_TY_CD) AS HDCH_HIST_TY_CD_NM_EN
+		,NVL2(DECODE(A.HDCH_BGNDE,'미상','',A.HDCH_BGNDE),A.HDCH_BGNDE,NVL2(A.PRSMP_ERA_DT,A.PRSMP_ERA_DT,A.HDCH_ENDDE)) AS HDCH_ORDER
+		,(SELECT LISTAGG(CD.CD_NM, ' ') WITHIN GROUP (ORDER BY CD.CD) FROM TC_CMMN_CD_DETAIL CD WHERE CD.CD_ID='ADRES_CD' AND CD.CD IN (A.ADRES1,A.ADRES2)) AS ADRES
+		FROM TK_HDCH_HIST A
+		WHERE A.HDCH_HIST_ID = #{hdchHistId}
+		ORDER BY A.HDCH_HIST_NO
+		]]>
+	</select>
+
+	<delete id="deleteHdchHist" parameterType="zvl">
+		<![CDATA[
+			/*deleteHdchHist*/
+			/*소장이력 삭제*/
+			DELETE FROM TK_HDCH_HIST
+			WHERE HDCH_HIST_NO = #{hdchHistNo}
+		]]>
+	</delete>
+</mapper>

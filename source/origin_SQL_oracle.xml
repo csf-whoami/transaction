@@ -1,0 +1,1377 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="origin">
+	<sql id="origin-where">
+			<if test='mastrTableCd != null and mastrTableCd != ""'>
+				<![CDATA[	AND A.MASTR_TABLE_CD = #{mastrTableCd}	]]>
+			</if>
+			<!-- userId 가 넘어온다면 다음 쿼리문을 실행 -->
+			<if test='psitnNm != null and psitnNm != ""'>
+				<![CDATA[	
+							AND EXISTS (
+								      SELECT 1 FROM TK_REQST 
+								      WHERE MASTR_TABLE_CD = A.MASTR_TABLE_CD AND MASTR_TABLE_SN = A.MASTR_TABLE_SN
+								      AND PSITN_NM = #{psitnNm}
+								     )
+				]]>
+			</if>
+	</sql>
+	<!-- 관리번호/출처 검색 쿼리문(2020-12-02 생성) -->
+	<sql id="search-where">
+			<if test='sdate != null and sdate != ""'>
+			<![CDATA[	AND TO_CHAR(C.REGIST_DT, 'YYYYMMDD') >= REPLACE(#{sdate},'-','') 		]]>
+			</if>
+			<if test='edate != null and edate != ""'>
+				<![CDATA[	AND TO_CHAR(C.REGIST_DT, 'YYYYMMDD') <= REPLACE(#{edate},'-','') 		]]>
+			</if>
+			<if test='searchWrd != null and searchWrd != ""'>
+				<if test='searchCnd == "1"'>
+					<![CDATA[	AND A.REPRSNT_NM LIKE '%' || #{searchWrd} || '%' 		]]>
+				</if>
+				<if test='searchCnd == "2"'>
+					<![CDATA[	AND A.DETAIL_CN LIKE '%' || #{searchWrd} || '%' 		]]>
+				</if>
+			</if>
+			<if test='searchLink == "Y"'>
+	        AND EXISTS (
+	            SELECT 1
+	            FROM TK_ORIGIN A1
+	            INNER JOIN TK_DETAIL B1
+	            ON A1.DETAIL_SN = B1.DETAIL_SN
+	            INNER JOIN TK_REQST C1
+	            ON B1.MASTR_TABLE_CD = C1.MASTR_TABLE_CD
+	            AND B1.MASTR_TABLE_SN = C1.MASTR_TABLE_SN
+	            AND C1.USE_AT = 'Y'
+	            AND C1.DELETE_CD = '0'
+	            WHERE 1=1
+	            AND A1.ORIGIN_ID = A.ORIGIN_ID
+	        )
+			</if>
+	</sql>
+	<!-- 등록일순/활동시기 ORDER BY 쿼리문(2020-12-02 생성) -->
+	<sql id="order-where">
+		<if test='leaderAt != null and leaderAt != "" and leaderAt == "Y"'>
+			<if test='searchCtg == null or searchCtg == "none"'>
+				<![CDATA[
+							ORDER BY REGIST_DT DESC , DECODE(CONFM_STTUS_CD, 'A',1,'RA',2,'R',3,'I',4,'U',5,'C',6)
+							, DECODE(REPRSNT_AT, 'Y', 1), DTA_TY_CD, DECODE(ADIT_DTA_TY_CD, '2', 1, '3', 2, '1', 3, '4', 4), LANG_CD, DETAIL_SN
+				 		]]>
+			</if>
+			<if test='searchCtg == "1"'>
+				<if test='selectOrd == "1"'>
+					<![CDATA[
+						ORDER BY REGIST_DT ASC, DECODE(CONFM_STTUS_CD, 'A',1,'RA',2,'R',3,'I',4,'U',5,'C',6)
+						, DECODE(REPRSNT_AT, 'Y', 1), DTA_TY_CD, DECODE(ADIT_DTA_TY_CD, '2', 1, '3', 2, '1', 3, '4', 4), LANG_CD, DETAIL_SN
+					 		]]>
+				 </if>
+				 <if test='selectOrd == "2"'>
+				 	<![CDATA[
+				 		ORDER BY REGIST_DT DESC, DECODE(CONFM_STTUS_CD, 'A',1,'RA',2,'R',3,'I',4,'U',5,'C',6)
+						, DECODE(REPRSNT_AT, 'Y', 1), DTA_TY_CD, DECODE(ADIT_DTA_TY_CD, '2', 1, '3', 2, '1', 3, '4', 4), LANG_CD, DETAIL_SN
+				 		]]>
+				 </if>
+			</if>
+			<if test='searchCtg == "2"'>
+				<if test='selectOrd == "1"'>
+					<![CDATA[
+						ORDER BY FN_DATE_SORT(NVL(NVL(BGNDE_DT,ENDDE_DT),PRSMP_DT)) ASC NULLS LAST, DECODE(CONFM_STTUS_CD, 'A',1,'RA',2,'R',3,'I',4,'U',5,'C',6)
+						, DECODE(REPRSNT_AT, 'Y', 1), DTA_TY_CD, DECODE(ADIT_DTA_TY_CD, '2', 1, '3', 2, '1', 3, '4', 4), LANG_CD, DETAIL_SN
+						]]>
+				</if>
+				<if test='selectOrd == "2"'>
+					<![CDATA[
+						ORDER BY FN_DATE_SORT(NVL(NVL(BGNDE_DT,ENDDE_DT),PRSMP_DT)) DESC NULLS LAST, DECODE(CONFM_STTUS_CD, 'A',1,'RA',2,'R',3,'I',4,'U',5,'C',6)
+						, DECODE(REPRSNT_AT, 'Y', 1), DTA_TY_CD, DECODE(ADIT_DTA_TY_CD, '2', 1, '3', 2, '1', 3, '4', 4), LANG_CD, DETAIL_SN
+						]]>
+				</if>
+			</if>
+		</if>
+		<!-- 팀원은 자신의 팀자료는 모두 조회 (적용 2020-06-29) -->
+		<if test='memberAt != null and memberAt != "" and memberAt == "Y"'>
+			<if test='searchCtg == null or searchCtg == "none"'>
+				<![CDATA[
+							ORDER BY REGIST_DT DESC, DECODE(CONFM_STTUS_CD, 'A',4,'RA',5,'R',1,'I',2,'U',3,'C',6)
+							, DECODE(REPRSNT_AT, 'Y', 1), DTA_TY_CD, DECODE(ADIT_DTA_TY_CD, '2', 1, '3', 2, '1', 3, '4', 4), LANG_CD, DETAIL_SN
+				 		]]>
+			</if>
+			<if test='searchCtg != null and searchCtg != ""'>
+				<if test='searchCtg == "1"'>
+					<if test='selectOrd == "1"'>
+						<![CDATA[
+							ORDER BY REGIST_DT ASC, DECODE(CONFM_STTUS_CD, 'A',4,'RA',5,'R',1,'I',2,'U',3,'C',6)
+							, DECODE(REPRSNT_AT, 'Y', 1), DTA_TY_CD, DECODE(ADIT_DTA_TY_CD, '2', 1, '3', 2, '1', 3, '4', 4), LANG_CD, DETAIL_SN
+							]]>
+					</if>
+					<if test='selectOrd == "2"'>
+						<![CDATA[
+							ORDER BY REGIST_DT DESC, DECODE(CONFM_STTUS_CD, 'A',4,'RA',5,'R',1,'I',2,'U',3,'C',6)
+							, DECODE(REPRSNT_AT, 'Y', 1), DTA_TY_CD, DECODE(ADIT_DTA_TY_CD, '2', 1, '3', 2, '1', 3, '4', 4), LANG_CD, DETAIL_SN
+						]]>
+					</if>
+				</if>
+					<if test='searchCtg == "2"'>
+						<if test='selectOrd == "1"'>
+							<![CDATA[
+								ORDER BY FN_DATE_SORT(NVL(NVL(BGNDE_DT,ENDDE_DT),PRSMP_DT)) ASC NULLS LAST, DECODE(CONFM_STTUS_CD, 'A',4,'RA',5,'R',1,'I',2,'U',3,'C',6)
+								, DECODE(REPRSNT_AT, 'Y', 1), DTA_TY_CD, DECODE(ADIT_DTA_TY_CD, '2', 1, '3', 2, '1', 3, '4', 4), LANG_CD, DETAIL_SN
+								]]>
+						</if>
+						<if test='selectOrd == "2"'>
+							<![CDATA[
+								ORDER BY FN_DATE_SORT(NVL(NVL(BGNDE_DT,ENDDE_DT),PRSMP_DT)) DESC NULLS LAST, DECODE(CONFM_STTUS_CD, 'A',4,'RA',5,'R',1,'I',2,'U',3,'C',6)
+								, DECODE(REPRSNT_AT, 'Y', 1), DTA_TY_CD, DECODE(ADIT_DTA_TY_CD, '2', 1, '3', 2, '1', 3, '4', 4), LANG_CD, DETAIL_SN
+								]]>
+						</if>
+					</if>
+			</if>
+		</if>
+		<if test='(leaderAt == null or leaderAt == "") and (memberAt == null or memberAt == "") and (memberAt != "Y" and leaderAt != "Y")'>
+			<if test='searchCtg == null or searchCtg == "none"'>
+				<![CDATA[
+							ORDER BY REGIST_DT DESC, DECODE(REPRSNT_AT, 'Y', 1), DTA_TY_CD, DECODE(ADIT_DTA_TY_CD, '2', 1, '3', 2, '1', 3, '4', 4), LANG_CD, DETAIL_SN
+				 		]]>
+			</if>
+			<if test='searchCtg != null and searchCtg != ""'>
+				<if test='searchCtg == "1"'>
+					<if test='selectOrd == "1"'>
+						<![CDATA[
+							ORDER BY REGIST_DT ASC, DECODE(REPRSNT_AT, 'Y', 1), DTA_TY_CD, DECODE(ADIT_DTA_TY_CD, '2', 1, '3', 2, '1', 3, '4', 4), LANG_CD, DETAIL_SN
+						]]>
+					</if>
+					<if test='selectOrd == "2"'>
+						<![CDATA[
+							ORDER BY REGIST_DT DESC, DECODE(REPRSNT_AT, 'Y', 1), DTA_TY_CD, DECODE(ADIT_DTA_TY_CD, '2', 1, '3', 2, '1', 3, '4', 4), LANG_CD, DETAIL_SN
+							]]>
+					</if>
+				</if>
+				<if test='searchCtg == "2"'>
+					<if test='selectOrd == "1"'>
+						<![CDATA[
+							ORDER BY FN_DATE_SORT(NVL(NVL(BGNDE_DT,ENDDE_DT),PRSMP_DT)) ASC NULLS LAST, DECODE(REPRSNT_AT, 'Y', 1), DTA_TY_CD, DECODE(ADIT_DTA_TY_CD, '2', 1, '3', 2, '1', 3, '4', 4), LANG_CD, DETAIL_SN
+							
+						 ]]>
+					</if>
+					<if test='selectOrd == "2"'>
+						<![CDATA[
+							ORDER BY FN_DATE_SORT(NVL(NVL(BGNDE_DT,ENDDE_DT),PRSMP_DT)) DESC NULLS LAST, DECODE(REPRSNT_AT, 'Y', 1), DTA_TY_CD, DECODE(ADIT_DTA_TY_CD, '2', 1, '3', 2, '1', 3, '4', 4), LANG_CD, DETAIL_SN
+							]]>
+					</if>
+				</if>
+			</if>
+		</if>
+	</sql>
+	<resultMap id="originResultMap" type="zvl">
+		<result property="fileCn" column="FILE_CN" jdbcType="CLOB" javaType="string" />
+	</resultMap>
+
+	<resultMap id="originDataResultMap" type="zvl">
+		<result property="mastrTableCd" column="MASTR_TABLE_CD" jdbcType="VARCHAR" javaType="string" />
+		<result property="mastrTableSn" column="MASTR_TABLE_SN" jdbcType="VARCHAR" javaType="string" />
+	</resultMap>
+
+	<!-- 작가 출처 목록 -->
+	<resultMap id="writrOriginDataResultMap" type="zvl">
+		<result property="reprsntNm" column="REPRSNT_NM" jdbcType="VARCHAR" javaType="string" />
+		<result property="atchFileId" column="ATCH_FILE_ID" jdbcType="VARCHAR" javaType="string" />
+		<result property="fileCn" column="FILE_CN" jdbcType="CLOB" javaType="string" />
+		<result property="detailNo" column="WRITR_NO" jdbcType="NUMERIC" javaType="string" />
+	</resultMap>
+
+	<!-- 작품 출처 목록 -->
+	<resultMap id="prdctOriginDataResultMap" type="zvl">
+		<result property="cdNm" column="CD_NM" jdbcType="VARCHAR" javaType="string" />
+		<result property="reprsntNm" column="REPRSNT_NM" jdbcType="VARCHAR" javaType="string" />
+		<result property="bgnde" column="PRDCT_BGNDE" jdbcType="VARCHAR" javaType="string" />
+		<result property="endde" column="PRDCT_ENDDE" jdbcType="VARCHAR" javaType="string" />
+		<result property="prsmpEraDt" column="PRSMP_ERA_DT" jdbcType="VARCHAR" javaType="string" />
+		<result property="atchFileId" column="ATCH_FILE_ID" jdbcType="VARCHAR" javaType="string" />
+		<result property="fileCn" column="FILE_CN" jdbcType="CLOB" javaType="string" />
+		<result property="detailNo" column="PRDCT_NO" jdbcType="NUMERIC" javaType="string" />
+	</resultMap>
+
+	<!-- 작품외자료 출처 목록 -->
+	<resultMap id="prdctElseOriginDataResultMap" type="zvl">
+		<result property="cdNm" column="CD_NM" jdbcType="VARCHAR" javaType="string" />
+		<result property="reprsntNm" column="REPRSNT_NM" jdbcType="VARCHAR" javaType="string" />
+		<result property="bgnde" column="PRDCTN_BGNDE" jdbcType="VARCHAR" javaType="string" />
+		<result property="endde" column="PRDCTN_ENDDE" jdbcType="VARCHAR" javaType="string" />
+		<result property="prsmpEraDt" column="PRSMP_ERA_DT" jdbcType="VARCHAR" javaType="string" />
+		<result property="atchFileId" column="ATCH_FILE_ID" jdbcType="VARCHAR" javaType="string" />
+		<result property="fileCn" column="FILE_CN" jdbcType="CLOB" javaType="string" />
+		<result property="detailNo" column="PRDCT_ELSE_NO" jdbcType="NUMERIC" javaType="string" />
+	</resultMap>
+
+	<!-- 참고문헌 출처 목록 -->
+	<resultMap id="referLtrtreOriginDataResultMap" type="zvl">
+		<result property="cdNm" column="CD_NM" jdbcType="VARCHAR" javaType="string" />
+		<result property="reprsntNm" column="REPRSNT_NM" jdbcType="VARCHAR" javaType="string" />
+		<result property="prsmpEraDt" column="PRDCTN_ERA_DT" jdbcType="VARCHAR" javaType="string" />
+		<result property="atchFileId" column="ATCH_FILE_ID" jdbcType="VARCHAR" javaType="string" />
+		<result property="fileCn" column="FILE_CN" jdbcType="CLOB" javaType="string" />
+		<result property="detailNo" column="REFER_LTRTRE_NO" jdbcType="NUMERIC" javaType="string" />
+		<result property="isu" column="ISU" jdbcType="VARCHAR" javaType="string" />
+	</resultMap>
+
+	<!-- 전시이력 출처 목록 -->
+	<resultMap id="exbiOriginDataResultMap" type="zvl">
+		<result property="cdNm" column="CD_NM" jdbcType="VARCHAR" javaType="string" />
+		<result property="reprsntNm" column="REPRSNT_NM" jdbcType="VARCHAR" javaType="string" />
+		<result property="placeNm" column="PLACE_NM" jdbcType="VARCHAR" javaType="string" />
+		<result property="bgnde" column="EXBI_BGNDE" jdbcType="VARCHAR" javaType="string" />
+		<result property="endde" column="EXBI_ENDDE" jdbcType="VARCHAR" javaType="string" />
+		<result property="prsmpEraDt" column="PRSMP_ERA_DT" jdbcType="VARCHAR" javaType="string" />
+		<result property="atchFileId" column="ATCH_FILE_ID" jdbcType="VARCHAR" javaType="string" />
+		<result property="fileCn" column="FILE_CN" jdbcType="CLOB" javaType="string" />
+		<result property="detailNo" column="EXBI_NO" jdbcType="NUMERIC" javaType="string" />
+		<result property="subjectEng" column="SUBJECT_ENG" jdbcType="VARCHAR" javaType="string" />
+	</resultMap>
+
+	<!-- 인용문 출처 목록 -->
+	<resultMap id="qotatOriginDataResultMap" type="zvl">
+		<result property="cdNm" column="CD_NM" jdbcType="VARCHAR" javaType="string" />
+		<result property="reprsntNm" column="REPRSNT_NM" jdbcType="VARCHAR" javaType="string" />
+		<result property="bgnde" column="QOTAT_BGNDE" jdbcType="VARCHAR" javaType="string" />
+		<result property="endde" column="QOTAT_ENDDE" jdbcType="VARCHAR" javaType="string" />
+		<result property="prsmpEraDt" column="PRSMP_ERA_DT" jdbcType="VARCHAR" javaType="string" />
+		<result property="atchFileId" column="ATCH_FILE_ID" jdbcType="VARCHAR" javaType="string" />
+		<result property="fileCn" column="FILE_CN" jdbcType="CLOB" javaType="string" />
+		<result property="detailNo" column="QOTAT_NO" jdbcType="NUMERIC" javaType="string" />
+	</resultMap>
+
+	<!-- 연구자 노트 -->
+	<resultMap id="reqstOriginDataResultMap" type="zvl">
+		<result property="writngNoteCn" column="WRITNG_NOTE_CN" jdbcType="CLOB" javaType="string" />
+		<result property="writngNoteCnEn" column="WRITNG_NOTE_CN_EN" jdbcType="CLOB" javaType="string" />
+	</resultMap>
+
+	<select id="searchOrigin" parameterType="zvl" resultMap="originResultMap">
+		<![CDATA[
+		/*searchOrigin*/
+		/*출처 검색*/
+		SELECT
+			CASE
+				WHEN A.MASTR_TABLE_CD = 'W' THEN (SELECT C.FILE_STRE_COURS
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_WRITR B WHERE B.WRITR_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+           		WHEN A.MASTR_TABLE_CD = 'Q' THEN (SELECT C.FILE_STRE_COURS
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_QOTAT B WHERE B.QOTAT_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+  				WHEN A.MASTR_TABLE_CD = 'A' THEN (SELECT C.FILE_STRE_COURS
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_ANLRPT B WHERE B.ANLRPT_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+  				WHEN A.MASTR_TABLE_CD = 'P' THEN (SELECT C.FILE_STRE_COURS
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_PRDCT B WHERE B.PRDCT_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+  				WHEN A.MASTR_TABLE_CD = 'PE' THEN (SELECT C.FILE_STRE_COURS
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_PRDCT_ELSE B WHERE B.PRDCT_ELSE_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+  				WHEN A.MASTR_TABLE_CD = 'R' THEN (SELECT C.FILE_STRE_COURS
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_REFER_LTRTRE B WHERE B.REFER_LTRTRE_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+  				WHEN A.MASTR_TABLE_CD = 'E' THEN (SELECT C.FILE_STRE_COURS
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_EXBI B WHERE B.EXBI_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+            ELSE ''
+           END FILE_STRE_COURS,
+           CASE
+				WHEN A.MASTR_TABLE_CD = 'W' THEN (SELECT C.STRE_FILE_NM
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_WRITR B WHERE B.WRITR_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+           		WHEN A.MASTR_TABLE_CD = 'Q' THEN (SELECT C.STRE_FILE_NM
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_QOTAT B WHERE B.QOTAT_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+  				WHEN A.MASTR_TABLE_CD = 'A' THEN (SELECT C.STRE_FILE_NM
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_ANLRPT B WHERE B.ANLRPT_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+  				WHEN A.MASTR_TABLE_CD = 'P' THEN (SELECT C.STRE_FILE_NM
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_PRDCT B WHERE B.PRDCT_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+  				WHEN A.MASTR_TABLE_CD = 'PE' THEN (SELECT C.STRE_FILE_NM
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_PRDCT_ELSE B WHERE B.PRDCT_ELSE_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+  				WHEN A.MASTR_TABLE_CD = 'R' THEN (SELECT C.STRE_FILE_NM
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_REFER_LTRTRE B WHERE B.REFER_LTRTRE_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+  				WHEN A.MASTR_TABLE_CD = 'E' THEN (SELECT C.STRE_FILE_NM
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_EXBI B WHERE B.EXBI_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+            ELSE ''
+           END STRE_FILE_NM,
+           CASE
+				WHEN A.MASTR_TABLE_CD = 'W' THEN (SELECT C.FILE_CN
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_WRITR B WHERE B.WRITR_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+           		WHEN A.MASTR_TABLE_CD = 'Q' THEN (SELECT C.FILE_CN
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_QOTAT B WHERE B.QOTAT_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+  				WHEN A.MASTR_TABLE_CD = 'A' THEN (SELECT C.FILE_CN
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_ANLRPT B WHERE B.ANLRPT_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+  				WHEN A.MASTR_TABLE_CD = 'P' THEN (SELECT C.FILE_CN
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_PRDCT B WHERE B.PRDCT_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+  				WHEN A.MASTR_TABLE_CD = 'PE' THEN (SELECT C.FILE_CN
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_PRDCT_ELSE B WHERE B.PRDCT_ELSE_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+  				WHEN A.MASTR_TABLE_CD = 'R' THEN (SELECT C.FILE_CN
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_REFER_LTRTRE B WHERE B.REFER_LTRTRE_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+  				WHEN A.MASTR_TABLE_CD = 'E' THEN (SELECT C.FILE_CN
+            									FROM TC_CMMN_FILE_DETAIL C
+												WHERE C.ATCH_FILE_ID = (SELECT B.ATCH_FILE_ID FROM TK_EXBI B WHERE B.EXBI_NO = A.MASTR_TABLE_SN)
+												AND C.FILE_FIELD_NM LIKE 'repImg%')
+           END FILE_CN,
+			   A.DETAIL_SN,
+		       A.MASTR_TABLE_CD,
+		       A.MASTR_TABLE_SN,
+		       A.DTA_TY_CD,
+		       A.ADIT_DTA_TY_CD,
+		       A.DETAIL_ORDR,
+		       A.DETAIL_CN,
+		       A.LANG_CD,
+		       A.SEARCH_AT,
+		       A.EXPSR_ORDR,
+		       A.REPRSNT_AT,
+		       A.ORIGIN_ID,
+		       A.DETAIL_FIELD_TY_CD,
+		       A.REPRSNT_NM
+		FROM   TK_DETAIL A
+		WHERE  SEARCH_AT = 'Y'
+		]]>
+		<include refid="origin-where" />
+		<if test='originsearchWrd != null and originsearchWrd != ""'>
+		<![CDATA[
+		AND  (A.REPRSNT_NM LIKE '%'||#{originsearchWrd}|| '%'
+		   OR  A.DETAIL_CN LIKE '%'||#{originsearchWrd}|| '%')
+		]]>
+		</if>
+	</select>
+	<insert id="savePasingOrigin" parameterType="zvl">
+		<selectKey resultType="long" order="BEFORE" keyProperty="originSn">
+			SELECT SEQ_ORIGIN_SN.NEXTVAL AS NTT_ID FROM dual
+		</selectKey>
+		<![CDATA[
+		/*savePasingOrigin*/
+		/*파싱후 등록*/
+		INSERT
+		INTO TK_ORIGIN(
+	       ORIGIN_SN,
+	       ORIGIN_ID,
+	       DETAIL_SN,
+	       ORIGIN_DETAIL_CN,
+	       ORIGIN_DETAIL_CN_EN,
+	       ORIGIN_ORDR,
+	       MASTR_TABLE_CD,
+	       MASTR_TABLE_SN,
+	       MASTR_COLUMN_NM
+	       )
+		VALUES(
+	       #{originSn},
+	       #{originId},
+	       #{detailSn},
+	       #{originDetailCn},
+	       #{originDetailCnEn},
+	       #{originOrdr},
+	       #{mastrTableCd},
+	       #{mastrTableSn},
+	       #{mastrColumnNm}
+	       )
+		]]>
+	</insert>
+	<select id="findAllOrigin" parameterType="zvl" resultType="zvl">
+		<![CDATA[
+		/*findAllOrigin*/
+		/*출처 List*/
+		SELECT A.ORIGIN_ID,
+			   A.ORIGIN_DETAIL_CN,
+			   A.ORIGIN_DETAIL_CN_EN,
+			   A.ORIGIN_ORDR,
+			   A.ORIGIN_SN,
+			   B.DETAIL_SN,
+		       B.MASTR_TABLE_CD,
+		       B.MASTR_TABLE_SN,
+		       B.DTA_TY_CD,
+		       B.ADIT_DTA_TY_CD,
+		       B.DETAIL_ORDR,
+		       B.DETAIL_CN,
+		       B.LANG_CD,
+		       B.SEARCH_AT,
+		       B.EXPSR_ORDR,
+		       B.REPRSNT_AT,
+		       B.ORIGIN_ID,
+		       B.DETAIL_FIELD_TY_CD,
+		       B.REPRSNT_NM
+		FROM   TK_ORIGIN A,
+		       TK_DETAIL B
+		WHERE  A.DETAIL_SN = B.DETAIL_SN
+		AND    A.ORIGIN_ID = #{originId}
+		ORDER BY A.ORIGIN_SN
+		]]>
+	</select>
+	<select id="findAllmOrigin" parameterType="zvl" resultType="zvl">
+		<![CDATA[
+		/*findAllmOrigin*/
+		/*수기 출처 List*/
+		SELECT A.ORIGIN_ID,
+			   A.ORIGIN_DETAIL_CN,
+			   A.ORIGIN_DETAIL_CN_EN,
+			   A.ORIGIN_ORDR,
+			   A.ORIGIN_SN
+		FROM   TK_ORIGIN A
+		WHERE  A.DETAIL_SN IS NULL
+		AND    A.ORIGIN_ID = #{originId}
+		ORDER BY A.ORIGIN_SN
+		]]>
+	</select>
+	<delete id="deleteOrigin" parameterType="zvl">
+		<![CDATA[
+			/*deleteOrigin*/
+			/*출처 detailSn 기준 삭제*/
+			DELETE FROM TK_ORIGIN
+			WHERE DETAIL_SN = #{detailSn}
+		]]>
+	</delete>
+	<delete id="deleteOriginId" parameterType="zvl">
+		<![CDATA[
+			/*deleteOriginId*/
+			/*출처 originId 기준 삭제*/
+			DELETE FROM TK_ORIGIN
+			WHERE ORIGIN_ID = #{originId}
+		]]>
+	</delete>
+	<delete id="deleteOriginDetail" parameterType="zvl">
+		<![CDATA[
+			/*deleteOriginDetail*/
+			/*출처 detailSn 모를 때 찾아서 삭제*/
+			DELETE FROM TK_ORIGIN
+			WHERE ORIGIN_ID IN (
+								SELECT ORIGIN_ID
+								FROM TK_DETAIL
+								WHERE MASTR_TABLE_CD = #{mastrTableCd}
+								AND MASTR_TABLE_SN = #{mastrTableSn}
+								)
+		]]>
+	</delete>
+	<delete id="deleteOriginDetailSn" parameterType="zvl">
+		<![CDATA[
+			/*deleteOriginDetailSn*/
+			/*출처 DETAIL_SN 으로 일괄 삭제*/
+			DELETE FROM TK_ORIGIN
+			WHERE DETAIL_SN IN (
+								SELECT DETAIL_SN
+								FROM TK_DETAIL
+								WHERE MASTR_TABLE_CD = #{mastrTableCd}
+								AND MASTR_TABLE_SN = #{mastrTableSn}
+								)
+		]]>
+	</delete>
+	<delete id="deleteOriginSn" parameterType="zvl">
+		<![CDATA[
+			/*deleteOriginSn*/
+			/*출처 ORIGIN_SN 기준 삭제*/
+			DELETE FROM TK_ORIGIN
+			WHERE ORIGIN_SN = #{originSn}
+		]]>
+	</delete>
+	<select id="findAlloriginInPortal" parameterType="zvl" resultType="zvl">
+		<![CDATA[
+		/*findAlloriginInPortal*/
+		/* 출처 리스트(detail 내용포함) - 마스터코드 마스터번호 기반*/
+		SELECT B.*
+		FROM TK_ORIGIN A , TK_DETAIL B
+		WHERE A.DETAIL_SN = B.DETAIL_SN
+		AND A.MASTR_TABLE_SN = #{mastrTableSn}
+		AND A.MASTR_TABLE_CD = #{mastrTableCd}
+		]]>
+	</select>
+
+	<select id="findAllOriginData" parameterType="zvl" resultMap="originDataResultMap">
+		<![CDATA[
+		/* findAllOriginData */
+		/* 열람중인 데이터의 출처 리스트 */
+		]]>
+		SELECT MASTR_TABLE_CD, MASTR_TABLE_SN
+		FROM 	(
+					(
+						SELECT A.MASTR_TABLE_CD, A.MASTR_TABLE_SN
+						FROM TK_DETAIL A
+						INNER JOIN TK_REQST B ON A.MASTR_TABLE_SN = B.MASTR_TABLE_SN
+						WHERE DETAIL_SN IN 	(
+												SELECT DETAIL_SN
+												FROM TK_ORIGIN
+												WHERE MASTR_TABLE_CD = #{nowMastrTableCd}
+												AND MASTR_TABLE_SN = #{nowMastrTableSn}
+											)
+						AND B.USE_AT='Y'
+						AND B.DELETE_CD='0'
+						AND B.CONFM_STTUS_CD = 'C'
+						AND B.MASTR_TABLE_CD = A.MASTR_TABLE_CD
+					)
+					UNION
+					(
+						SELECT A.MASTR_TABLE_CD, A.MASTR_TABLE_SN
+						FROM TK_ORIGIN A
+						INNER JOIN TK_REQST B ON A.MASTR_TABLE_SN = B.MASTR_TABLE_SN
+						WHERE DETAIL_SN IN 	(
+												SELECT DETAIL_SN
+												FROM TK_DETAIL
+												WHERE MASTR_TABLE_CD = #{nowMastrTableCd}
+												AND MASTR_TABLE_SN = #{nowMastrTableSn}
+											)
+						AND B.USE_AT='Y'
+						AND B.DELETE_CD='0'
+						AND B.CONFM_STTUS_CD = 'C'
+						AND B.MASTR_TABLE_CD = A.MASTR_TABLE_CD
+					)
+						UNION
+						(
+							SELECT B.MASTR_TABLE_CD,B.MASTR_TABLE_SN
+							FROM TK_WRITR A, TK_REQST B
+							WHERE A.WRITR_NO = B.MASTR_TABLE_SN
+							AND B.MASTR_TABLE_CD = 'W'
+							AND B.USE_AT='Y'
+							AND B.DELETE_CD='0'
+							AND B.CONFM_STTUS_CD = 'C'
+							AND A.WRITR_NO  = #{pWritrNo}
+						)
+				)
+		WHERE MASTR_TABLE_CD = #{mastrTableCd}
+	</select>
+
+	<select id="findAllOriginDataCnt" parameterType="zvl" resultType="zvl">
+		<![CDATA[
+		/* findAllOriginDataCnt */
+		/* 열람중인 데이터의 출처 리스트 카운트 */
+
+		SELECT AA.MASTR_TABLE_CD, NVL(ALL_LIST.CNT,0) AS CNT
+		FROM (
+				SELECT MASTR_TABLE_CD FROM TK_DETAIL
+				GROUP BY MASTR_TABLE_CD
+			) AA
+		LEFT OUTER JOIN (
+							SELECT MASTR_TABLE_CD, COUNT(MASTR_TABLE_CD) AS CNT
+							FROM 	(
+										(
+											SELECT A.MASTR_TABLE_CD, A.MASTR_TABLE_SN
+											FROM TK_DETAIL A
+											INNER JOIN TK_REQST B ON A.MASTR_TABLE_SN = B.MASTR_TABLE_SN
+											WHERE DETAIL_SN IN 	(
+																	SELECT DETAIL_SN
+																	FROM TK_ORIGIN
+																	WHERE MASTR_TABLE_CD = #{mastrTableCd}
+																	AND MASTR_TABLE_SN = #{mastrTableSn}
+																)
+											AND B.USE_AT='Y'
+											AND B.DELETE_CD='0'
+											AND B.CONFM_STTUS_CD = 'C'
+											AND B.MASTR_TABLE_CD = A.MASTR_TABLE_CD
+										)
+										UNION
+										(
+											SELECT A.MASTR_TABLE_CD, A.MASTR_TABLE_SN
+											FROM TK_ORIGIN A
+											INNER JOIN TK_REQST B ON A.MASTR_TABLE_SN = B.MASTR_TABLE_SN
+											WHERE DETAIL_SN IN 	(
+																	SELECT DETAIL_SN
+																	FROM TK_DETAIL
+																	WHERE MASTR_TABLE_CD = #{mastrTableCd}
+																	AND MASTR_TABLE_SN = #{mastrTableSn}
+																)
+											AND B.USE_AT='Y'
+											AND B.DELETE_CD='0'
+											AND B.CONFM_STTUS_CD = 'C'
+											AND B.MASTR_TABLE_CD = A.MASTR_TABLE_CD
+										)
+											UNION
+											(
+												SELECT B.MASTR_TABLE_CD,B.MASTR_TABLE_SN
+												FROM TK_WRITR A, TK_REQST B
+												WHERE A.WRITR_NO = B.MASTR_TABLE_SN
+												AND B.MASTR_TABLE_CD = 'W'
+												AND B.USE_AT='Y'
+												AND B.DELETE_CD='0'
+												AND A.WRITR_NO  = #{writrNo}
+											)
+									)
+							WHERE MASTR_TABLE_CD IN ('P','PE','RL','E','Q','W')
+							GROUP BY MASTR_TABLE_CD
+						)ALL_LIST ON AA.MASTR_TABLE_CD = ALL_LIST.MASTR_TABLE_CD
+						WHERE AA.MASTR_TABLE_CD IN ('P', 'PE','RL','E','Q')
+						ORDER BY DECODE(AA.MASTR_TABLE_CD, 'P', 1, 'PE', 2, 'RL', 3, 'E', 4, 'Q', 5)
+						]]>
+	</select>
+
+	<select id="findAllWritrOriginData" parameterType="zvl" resultMap="writrOriginDataResultMap">
+		<![CDATA[
+		/* findAllWritrOriginData */
+		/* 작가 출처 목록 */
+		]]>
+		SELECT	*
+		FROM	(
+				SELECT ROWNUM NUM, A.WRITR_NO, A.ATCH_FILE_ID,
+				C.FILE_SN,C.FILE_STRE_COURS,C.STRE_FILE_NM,C.FILE_CN,C.FILE_FIELD_NM,
+				NVL(FN_DETAIL_LANG('W',A.WRITR_NO,'wnm',#{langCd}),A.REPRSNT_NM) AS REPRSNT_NM
+				FROM TK_WRITR A
+				INNER JOIN TK_REQST R ON A.WRITR_NO = R.MASTR_TABLE_SN
+				LEFT OUTER JOIN TC_CMMN_FILE_DETAIL C ON A.ATCH_FILE_ID = C.ATCH_FILE_ID
+				WHERE A.WRITR_NO IN
+				<foreach collection="mastrTableSnList" item="item" index="index" separator="," open="(" close=")">
+		                    #{item}
+		        </foreach>
+		        AND (C.FILE_FIELD_NM LIKE 'repImg%' OR C.ATCH_FILE_ID IS NULL)
+     			AND R.USE_AT = 'Y'
+				AND R.DELETE_CD = '0'
+				AND R.CONFM_STTUS_CD = 'C'
+				AND R.MASTR_TABLE_CD = 'W'
+		        )
+	    WHERE NUM BETWEEN #{nowCnt} AND #{pageCnt}
+	</select>
+
+	<select id="findAllPrdctOriginData" parameterType="zvl" resultMap="prdctOriginDataResultMap">
+		<![CDATA[
+		/* findAllPrdctOriginData */
+		/* 작품 출처 목록 */
+		]]>
+		SELECT	*
+		FROM	(
+				SELECT ROWNUM NUM, A.PRDCT_NO, B.CD_NM , B.CD_ENG_NM, NVL(FN_DETAIL_LANG('P',A.PRDCT_NO,'prdct',#{langCd}),DT.DETAIL_CN) AS REPRSNT_NM, A.PRDCT_BGNDE, A.PRDCT_ENDDE,A.PRSMP_ERA_DT,A.ATCH_FILE_ID,
+				C.FILE_SN,C.FILE_STRE_COURS,C.STRE_FILE_NM,C.FILE_CN,C.FILE_FIELD_NM
+				FROM TK_PRDCT A
+				INNER JOIN TK_REQST R ON A.PRDCT_NO = R.MASTR_TABLE_SN
+				INNER JOIN TC_CMMN_CD_DETAIL B ON A.PRDCT_LCLAS_CD = B.CD AND B.CD_ID = 'PRDCT_TY_CD'
+				INNER JOIN TK_DETAIL DT ON DT.MASTR_TABLE_SN = A.PRDCT_NO
+				LEFT OUTER JOIN TC_CMMN_FILE_DETAIL C ON A.ATCH_FILE_ID = C.ATCH_FILE_ID
+				WHERE A.PRDCT_NO IN
+				<foreach collection="mastrTableSnList" item="item" index="index" separator="," open="(" close=")">
+		                    #{item}
+		        </foreach>
+		        AND (C.FILE_FIELD_NM LIKE 'repImg%' OR C.ATCH_FILE_ID IS NULL)
+		        AND DT.REPRSNT_AT = 'Y'
+				AND DT.DTA_TY_CD = 1
+				AND DT.MASTR_TABLE_CD = 'P'
+				AND R.USE_AT = 'Y'
+				AND R.DELETE_CD = '0'
+				AND R.CONFM_STTUS_CD = 'C'
+				AND R.MASTR_TABLE_CD = 'P'
+		        )
+	    WHERE NUM BETWEEN #{nowCnt} AND #{pageCnt}
+	</select>
+
+	<select id="findAllPrdctKwrdOriginData" parameterType="zvl" resultMap="prdctOriginDataResultMap">
+		<![CDATA[
+		/* findAllPrdctKwrdOriginData */
+		/* 작품 키워드 출처 목록 */
+		]]>
+		SELECT	*
+		FROM	(
+				SELECT ROWNUM NUM, A.PRDCT_NO, B.CD_NM , B.CD_ENG_NM, NVL(FN_DETAIL_LANG('P',A.PRDCT_NO,'prdct',#{langCd}),DT.DETAIL_CN) AS REPRSNT_NM, A.PRDCT_BGNDE, A.PRDCT_ENDDE,A.PRSMP_ERA_DT,A.ATCH_FILE_ID,
+				C.FILE_SN,C.FILE_STRE_COURS,C.STRE_FILE_NM,C.FILE_CN,C.FILE_FIELD_NM
+				FROM TK_PRDCT A
+				INNER JOIN TK_REQST R ON A.PRDCT_NO = R.MASTR_TABLE_SN
+				INNER JOIN TC_CMMN_CD_DETAIL B ON A.PRDCT_MLSFC_CD = B.CD AND B.CD_ID = 'PRDCT_TY_CD'
+				INNER JOIN TK_DETAIL DT ON DT.MASTR_TABLE_SN = A.PRDCT_NO
+				LEFT OUTER JOIN TC_CMMN_FILE_DETAIL C ON A.ATCH_FILE_ID = C.ATCH_FILE_ID
+				WHERE A.KWRD_NM = #{kwrdNm}
+		        AND (C.FILE_FIELD_NM LIKE 'repImg%' OR C.ATCH_FILE_ID IS NULL)
+		        AND DT.REPRSNT_AT = 'Y'
+				AND DT.DTA_TY_CD = 1
+				AND DT.MASTR_TABLE_CD = 'P'
+				AND R.USE_AT = 'Y'
+				AND R.DELETE_CD = '0'
+				AND R.CONFM_STTUS_CD = 'C'
+				AND R.MASTR_TABLE_CD = 'P'
+                ORDER BY
+                	NVL(NVL2(DECODE(A.PRDCT_BGNDE, '미상', '', A.PRDCT_BGNDE), A.PRDCT_BGNDE, NVL2(A.PRDCT_ENDDE, A.PRDCT_ENDDE, DECODE(A.PRSMP_ERA_DT, '미상', '', A.PRSMP_ERA_DT))),'0') DESC,
+                    ATCH_FILE_ID ASC
+		        )
+	    WHERE NUM BETWEEN #{nowCnt} AND #{pageCnt}
+	</select>
+
+	<select id="findAllPrdctKwrdOriginDataCnt" parameterType="zvl" resultType="zvl">
+		<![CDATA[
+		/* findAllPrdctKwrdOriginDataCnt */
+		/* 작품 키워드 출처 카운트 */
+
+		SELECT AA.MASTR_TABLE_CD, NVL(ALL_LIST.CNT,0) AS CNT
+		FROM (
+				SELECT MASTR_TABLE_CD FROM TK_DETAIL
+				GROUP BY MASTR_TABLE_CD
+			) AA
+		LEFT OUTER JOIN (
+							SELECT MASTR_TABLE_CD, NVL(COUNT(MASTR_TABLE_CD),0) AS CNT
+							FROM	(
+										SELECT MASTR_TABLE_CD, MASTR_TABLE_SN
+												FROM 	(
+															(
+																SELECT MASTR_TABLE_CD, MASTR_TABLE_SN
+																FROM TK_DETAIL
+																WHERE DETAIL_SN IN 	(
+																						SELECT DETAIL_SN
+																						FROM TK_ORIGIN
+																						WHERE MASTR_TABLE_CD = #{mastrTableCd}
+																						AND MASTR_TABLE_SN = #{mastrTableSn}
+																					)
+															)
+															UNION
+															(
+																SELECT MASTR_TABLE_CD, MASTR_TABLE_SN
+																FROM TK_ORIGIN
+																WHERE DETAIL_SN IN 	(
+																						SELECT DETAIL_SN
+																						FROM TK_DETAIL
+																						WHERE MASTR_TABLE_CD = #{mastrTableCd}
+																						AND MASTR_TABLE_SN = #{mastrTableSn}
+																					)
+															)
+															UNION
+															(
+																SELECT B.MASTR_TABLE_CD,B.MASTR_TABLE_SN
+																FROM TK_WRITR A, TK_REQST B
+																WHERE A.WRITR_NO = B.MASTR_TABLE_SN
+																AND B.MASTR_TABLE_CD = 'W'
+																AND B.USE_AT='Y'
+																AND B.DELETE_CD='0'
+																AND A.WRITR_NO  = #{writrNo}
+															)
+														)
+												WHERE MASTR_TABLE_CD IN ('PE','RL','E','Q')
+												UNION
+												(
+													SELECT B.MASTR_TABLE_CD, MASTR_TABLE_SN
+													FROM TK_PRDCT A
+													INNER JOIN TK_REQST B ON A.PRDCT_NO = B.MASTR_TABLE_SN
+													WHERE B.MASTR_TABLE_CD = 'P'
+													AND B.USE_AT = 'Y'
+													AND B.DELETE_CD = '0'
+													AND B.CONFM_STTUS_CD = 'C'
+													AND A.KWRD_NM = #{kwrdNm}
+												)
+											)
+									GROUP BY MASTR_TABLE_CD
+									)ALL_LIST ON AA.MASTR_TABLE_CD = ALL_LIST.MASTR_TABLE_CD
+									WHERE AA.MASTR_TABLE_CD IN ('P', 'PE','RL','E','Q')
+									ORDER BY DECODE(AA.MASTR_TABLE_CD, 'P', 1, 'PE', 2, 'RL', 3, 'E', 4, 'Q', 5)
+		]]>
+	</select>
+
+
+	<select id="findAllPrdctElseOriginData" parameterType="zvl" resultMap="prdctElseOriginDataResultMap">
+		<![CDATA[
+		/* findAllPrdctElseOriginData */
+		/* 작품외 출처 목록 */
+		]]>
+		SELECT	*
+		FROM	(
+				SELECT ROWNUM NUM, A.PRDCT_ELSE_NO, B.CD_NM , B.CD_ENG_NM, NVL(FN_DETAIL_LANG('PE',A.PRDCT_ELSE_NO,'prdctElse',#{langCd}),DT.DETAIL_CN) AS REPRSNT_NM, A.PRDCTN_BGNDE, A.PRDCTN_ENDDE,A.PRSMP_ERA_DT,A.ATCH_FILE_ID,
+				C.FILE_SN,C.FILE_STRE_COURS,C.STRE_FILE_NM,C.FILE_CN,C.FILE_FIELD_NM
+				FROM TK_PRDCT_ELSE A
+				INNER JOIN TK_REQST R ON A.PRDCT_ELSE_NO = R.MASTR_TABLE_SN
+				INNER JOIN TC_CMMN_CD_DETAIL B ON A.DTA_TY_CD = B.CD AND B.CD_ID = 'PRDCT_ELSE_TY_CD'
+				INNER JOIN TK_DETAIL DT ON DT.MASTR_TABLE_SN = A.PRDCT_ELSE_NO
+				LEFT OUTER JOIN TC_CMMN_FILE_DETAIL C ON A.ATCH_FILE_ID = C.ATCH_FILE_ID
+				WHERE A.PRDCT_ELSE_NO IN
+				<foreach collection="mastrTableSnList" item="item" index="index" separator="," open="(" close=")">
+		                    #{item}
+		        </foreach>
+			    AND (C.FILE_FIELD_NM LIKE 'repImg%' OR C.ATCH_FILE_ID IS NULL)
+			    AND DT.REPRSNT_AT = 'Y'
+				AND DT.DTA_TY_CD = 1
+				AND DT.MASTR_TABLE_CD = 'PE'
+				AND R.USE_AT = 'Y'
+				AND R.DELETE_CD = '0'
+				AND R.CONFM_STTUS_CD = 'C'
+				AND R.MASTR_TABLE_CD = 'PE'
+                ORDER BY
+                	NVL(NVL2(DECODE(A.PRDCTN_BGNDE, '미상', '', A.PRDCTN_BGNDE), A.PRDCTN_BGNDE, NVL2(A.PRDCTN_ENDDE, A.PRDCTN_ENDDE, DECODE(A.PRSMP_ERA_DT, '미상', '', A.PRSMP_ERA_DT))),'0') DESC,
+                    ATCH_FILE_ID ASC
+			    )
+	    WHERE NUM BETWEEN #{nowCnt} AND #{pageCnt}
+	</select>
+
+	<select id="findAllReferLtrtreOriginData" parameterType="zvl" resultMap="referLtrtreOriginDataResultMap">
+		<![CDATA[
+		/* findAllReferLtrtreOriginData */
+		/* 참고문헌 출처 목록 */
+		]]>
+		SELECT *
+		FROM	(
+					SELECT	ROWNUM NUM, ALL_LIST.*
+					FROM	(
+							SELECT A.REFER_LTRTRE_NO, B.CD_NM , B.CD_ENG_NM, NVL(FN_DETAIL_LANG('RL',A.REFER_LTRTRE_NO,'referLtrtre',#{langCd}),DT.DETAIL_CN) AS REPRSNT_NM, A.PRDCTN_ERA_DT,A.ATCH_FILE_ID,
+							C.FILE_SN,C.FILE_STRE_COURS,C.STRE_FILE_NM,C.FILE_CN,C.FILE_FIELD_NM
+							,(SELECT  LISTAGG(DD.DETAIL_CN, ', ') WITHIN GROUP (ORDER BY DECODE(DD.LANG_CD, #{langCd}, 1)) FROM  TK_DETAIL DD WHERE DD.MASTR_TABLE_CD = 'RL' AND DD.MASTR_TABLE_SN = A.REFER_LTRTRE_NO AND DD.DETAIL_FIELD_TY_CD = 'isu') AS ISU
+							,(SELECT DD.DETAIL_CN FROM  TK_DETAIL DD WHERE DD.MASTR_TABLE_CD = 'RL' AND DD.MASTR_TABLE_SN = A.REFER_LTRTRE_NO AND DD.DETAIL_FIELD_TY_CD = 'isu' AND DD.LANG_CD = '1'  AND ROWNUM = 1) AS ISU_KO
+							,(SELECT DD.DETAIL_CN FROM  TK_DETAIL DD WHERE DD.MASTR_TABLE_CD = 'RL' AND DD.MASTR_TABLE_SN = A.REFER_LTRTRE_NO AND DD.DETAIL_FIELD_TY_CD = 'isu' AND DD.LANG_CD = '2'  AND ROWNUM = 1) AS ISU_EN
+							FROM TK_REFER_LTRTRE A
+							INNER JOIN TK_REQST R ON A.REFER_LTRTRE_NO = R.MASTR_TABLE_SN
+							INNER JOIN TC_CMMN_CD_DETAIL B ON A.ADIT_DTA_TY_CD = B.CD AND B.CD_ID = 'ADIT_DTA_TY_CD'
+							INNER JOIN TK_DETAIL DT ON DT.MASTR_TABLE_SN = A.REFER_LTRTRE_NO
+							LEFT OUTER JOIN TC_CMMN_FILE_DETAIL C ON A.ATCH_FILE_ID = C.ATCH_FILE_ID
+							WHERE A.REFER_LTRTRE_NO IN
+							<foreach collection="mastrTableSnList" item="item" index="index" separator="," open="(" close=")">
+					                    #{item}
+					        </foreach>
+					        AND (C.FILE_FIELD_NM LIKE 'repImg%' OR C.ATCH_FILE_ID IS NULL)
+					        AND DT.REPRSNT_AT = 'Y'
+							AND DT.DTA_TY_CD = 1
+							AND DT.MASTR_TABLE_CD = 'RL'
+							AND R.USE_AT = 'Y'
+							AND R.DELETE_CD = '0'
+							AND R.CONFM_STTUS_CD = 'C'
+							AND R.MASTR_TABLE_CD = 'RL'
+			                ORDER BY
+			                	TO_NUMBER(NVL(SUBSTR(REGEXP_REPLACE(A.PRDCTN_ERA_DT, '[^0-9]'),0,4),0)) DESC ,
+								A.ATCH_FILE_ID DESC,
+								(SELECT  DD.DETAIL_CN FROM  TK_DETAIL DD WHERE DD.MASTR_TABLE_CD = 'RL' AND DD.MASTR_TABLE_SN = A.REFER_LTRTRE_NO AND DD.REPRSNT_AT = 'Y' AND DD.DETAIL_FIELD_TY_CD = 'referLtrtre') ASC
+			        		)ALL_LIST
+        		)
+	    WHERE NUM BETWEEN #{nowCnt} AND #{pageCnt}
+	</select>
+
+	<select id="findAllExbiOriginData" parameterType="zvl" resultMap="exbiOriginDataResultMap">
+		<![CDATA[
+		/* findAllExbiOriginData */
+		/* 전시이력 출처 목록 */
+		]]>
+		SELECT *
+		FROM	(
+					SELECT	ROWNUM NUM, ALL_LIST.*
+					FROM	(
+							SELECT A.EXBI_NO, B.CD_NM , B.CD_ENG_NM, NVL(FN_DETAIL_LANG('E',A.EXBI_NO,'exbi',#{langCd}),DT.DETAIL_CN) AS REPRSNT_NM, A.PLACE_NM, A.PLACE_NM_EN, A.EXBI_BGNDE, A.EXBI_ENDDE,A.PRSMP_ERA_DT,A.ATCH_FILE_ID,
+							C.FILE_SN,C.FILE_STRE_COURS,C.STRE_FILE_NM,C.FILE_CN,C.FILE_FIELD_NM
+							,(SELECT  LISTAGG(DD.DETAIL_CN, ', ') WITHIN GROUP (ORDER BY DETAIL_SN) FROM  TK_DETAIL DD WHERE DD.MASTR_TABLE_CD = 'E' AND DD.MASTR_TABLE_SN = A.EXBI_NO AND (REPRSNT_AT != 'Y' OR REPRSNT_AT IS NULL) AND DD.LANG_CD = 2) AS SUBJECT_ENG
+							FROM TK_EXBI A
+							INNER JOIN TK_REQST R ON A.EXBI_NO = R.MASTR_TABLE_SN
+							INNER JOIN TC_CMMN_CD_DETAIL B ON A.EXBI_TY_CD = B.CD AND B.CD_ID = 'EXBI_TY_CD'
+							INNER JOIN TK_DETAIL DT ON DT.MASTR_TABLE_SN = A.EXBI_NO
+							LEFT OUTER JOIN TC_CMMN_FILE_DETAIL C ON A.ATCH_FILE_ID = C.ATCH_FILE_ID
+							WHERE A.EXBI_NO IN
+							<foreach collection="mastrTableSnList" item="item" index="index" separator="," open="(" close=")">
+					                    #{item}
+					        </foreach>
+					        AND (C.FILE_FIELD_NM LIKE 'repImg%' OR C.ATCH_FILE_ID IS NULL)
+					        AND DT.REPRSNT_AT = 'Y'
+							AND DT.MASTR_TABLE_CD = 'E'
+							AND R.USE_AT = 'Y'
+							AND R.DELETE_CD = '0'
+							AND R.CONFM_STTUS_CD = 'C'
+							AND R.MASTR_TABLE_CD = 'E'
+			                ORDER BY
+			                	TO_NUMBER(NVL(RPAD(SUBSTR(REGEXP_REPLACE(NVL(A.EXBI_BGNDE,A.EXBI_ENDDE), '[^0-9]'),0,8),8,'0'),0)) DESC,
+			                	A.ATCH_FILE_ID ASC,
+			                	(SELECT  DD.DETAIL_CN FROM  TK_DETAIL DD WHERE DD.MASTR_TABLE_CD = 'E'	AND DD.MASTR_TABLE_SN = A.EXBI_NO AND DD.REPRSNT_AT = 'Y') ASC
+					        )ALL_LIST
+		        )
+	    WHERE NUM BETWEEN #{nowCnt} AND #{pageCnt}
+	</select>
+
+	<select id="findAllQotatOriginData" parameterType="zvl" resultMap="qotatOriginDataResultMap">
+		<![CDATA[
+		/* findAllQotatOriginData */
+		/* 인용문 출처 목록 */
+		]]>
+		SELECT	*
+		FROM	(
+				SELECT ROWNUM NUM, A.QOTAT_NO, B.CD_NM , B.CD_ENG_NM, A.REPRSNT_NM, A.QOTAT_BGNDE, A.QOTAT_ENDDE,A.PRSMP_ERA_DT,A.ATCH_FILE_ID,
+					   C.FILE_SN,C.FILE_STRE_COURS,C.STRE_FILE_NM,C.FILE_CN,C.FILE_FIELD_NM
+				FROM TK_QOTAT A
+				INNER JOIN TK_REQST R ON A.QOTAT_NO = R.MASTR_TABLE_SN
+				INNER JOIN TC_CMMN_CD_DETAIL B ON A.QOTAT_TY_CD = B.CD AND B.CD_ID = 'QOTAT_TY_CD'
+				LEFT OUTER JOIN TC_CMMN_FILE_DETAIL C ON A.ATCH_FILE_ID = C.ATCH_FILE_ID
+				WHERE A.QOTAT_NO IN
+				<foreach collection="mastrTableSnList" item="item" index="index" separator="," open="(" close=")">
+		                    #{item}
+		        </foreach>
+			    AND (C.FILE_FIELD_NM LIKE 'repImg%' OR C.ATCH_FILE_ID IS NULL)
+			    AND R.USE_AT = 'Y'
+				AND R.DELETE_CD = '0'
+				AND R.CONFM_STTUS_CD = 'C'
+				AND R.MASTR_TABLE_CD = 'Q'
+			    )
+	    WHERE NUM BETWEEN #{nowCnt} AND #{pageCnt}
+	</select>
+
+	<select id="findOneReqstOriginData" parameterType="zvl" resultMap="reqstOriginDataResultMap">
+		<![CDATA[
+		/* findOneReqstOriginData */
+		/* 연구자노트 */
+		]]>
+		SELECT NVL(WRITNG_NOTE_CN, 'null') AS WRITNG_NOTE_CN
+			  ,NVL(WRITNG_NOTE_CN_EN, 'null') AS WRITNG_NOTE_CN_EN
+		FROM TK_REQST
+		WHERE MASTR_TABLE_CD = #{nowMastrTableCd}
+		AND MASTR_TABLE_SN = #{nowMastrTableSn}
+	</select>
+	
+	<select id="findAllOriginListCount" parameterType="zvl" resultType="long">
+		<![CDATA[
+		/*findAllOriginListCount*/
+		/*출처 리스트 COUNT*/
+	    SELECT SUM(CONT) 
+	    FROM (
+	        SELECT COUNT(*) CONT
+	        FROM TK_DETAIL A 
+	        INNER JOIN TK_PRDCT B
+	        ON A.MASTR_TABLE_SN = B.PRDCT_NO
+	        INNER JOIN TK_REQST C
+	        ON B.PRDCT_NO = C.MASTR_TABLE_SN
+	        AND C.MASTR_TABLE_CD = 'P'
+	        AND C.USE_AT = 'Y'
+	        AND C.DELETE_CD = '0'
+	        WHERE 1=1
+	        AND A.MASTR_TABLE_CD = 'P'
+	        AND A.SEARCH_AT = 'Y'
+	        ]]>
+		    	<include refid="search-where" />
+		    <![CDATA[
+	        UNION
+	        SELECT COUNT(*) CONT
+	        FROM TK_DETAIL A 
+	        INNER JOIN TK_PRDCT_ELSE B
+	        ON A.MASTR_TABLE_SN = B.PRDCT_ELSE_NO
+	        INNER JOIN TK_REQST C
+	        ON B.PRDCT_ELSE_NO = C.MASTR_TABLE_SN
+	        AND C.MASTR_TABLE_CD = 'PE'
+	        AND C.USE_AT = 'Y'
+	        AND C.DELETE_CD = '0'
+	        WHERE 1=1
+	        AND A.MASTR_TABLE_CD = 'PE'
+	        AND A.SEARCH_AT = 'Y'
+	        ]]>
+		    	<include refid="search-where" />
+		    <![CDATA[
+	        UNION
+	        SELECT COUNT(*) CONT
+	        FROM TK_DETAIL A 
+	        INNER JOIN TK_REFER_LTRTRE B
+	        ON A.MASTR_TABLE_SN = B.REFER_LTRTRE_NO
+	        INNER JOIN TK_REQST C
+	        ON B.REFER_LTRTRE_NO = C.MASTR_TABLE_SN
+	        AND C.MASTR_TABLE_CD = 'RL'
+	        AND C.USE_AT = 'Y'
+	        AND C.DELETE_CD = '0'
+	        WHERE 1=1
+	        AND A.MASTR_TABLE_CD = 'RL'
+	        AND A.SEARCH_AT = 'Y'
+	        ]]>
+		    	<include refid="search-where" />
+		    <![CDATA[
+	        UNION
+	        SELECT COUNT(*) CONT
+	        FROM TK_DETAIL A 
+	        INNER JOIN TK_EXBI B
+	        ON A.MASTR_TABLE_SN = B.EXBI_NO
+	        INNER JOIN TK_REQST C
+	        ON B.EXBI_NO = C.MASTR_TABLE_SN
+	        AND C.MASTR_TABLE_CD = 'E'
+	        AND C.USE_AT = 'Y'
+	        AND C.DELETE_CD = '0'
+	        WHERE 1=1
+	        AND A.MASTR_TABLE_CD = 'E'
+	        AND A.SEARCH_AT = 'Y'
+	        ]]>
+		    	<include refid="search-where" />
+		    <![CDATA[
+	        UNION
+	        SELECT COUNT(*) CONT
+	        FROM TK_DETAIL A 
+	        INNER JOIN TK_ANLRPT B
+	        ON A.MASTR_TABLE_SN = B.ANLRPT_NO
+	        INNER JOIN TK_REQST C
+	        ON B.ANLRPT_NO = C.MASTR_TABLE_SN
+	        AND C.MASTR_TABLE_CD = 'A'
+	        AND C.USE_AT = 'Y'
+	        AND C.DELETE_CD = '0'
+	        WHERE 1=1
+	        AND A.MASTR_TABLE_CD = 'A'
+	        AND A.SEARCH_AT = 'Y'
+	        ]]>
+		    	<include refid="search-where" />
+		    <![CDATA[
+	        UNION
+	        SELECT COUNT(*) CONT
+	        FROM TK_DETAIL A 
+	        INNER JOIN TK_QOTAT B
+	        ON A.MASTR_TABLE_SN = B.QOTAT_NO
+	        INNER JOIN TK_REQST C
+	        ON B.QOTAT_NO = C.MASTR_TABLE_SN
+	        AND C.MASTR_TABLE_CD = 'Q'
+	        AND C.USE_AT = 'Y'
+	        AND C.DELETE_CD = '0'
+	        WHERE 1=1
+	        AND A.MASTR_TABLE_CD = 'Q'
+	        AND A.SEARCH_AT = 'Y'
+	        ]]>
+		    	<include refid="search-where" />
+		    <![CDATA[
+	    )
+		]]>
+	</select>
+	
+	<select id="findAllOriginList" parameterType="zvl" resultType="zvl">
+		<![CDATA[
+		/*findAllOriginList*/
+		/*출처 리스트*/
+		WITH T_TEMP AS (
+		    SELECT * 
+		    FROM (
+		        SELECT 
+		            A.DETAIL_SN
+		            , A.MASTR_TABLE_CD
+		            , '작품' AS MASTR_TABLE_NM
+		            , A.MASTR_TABLE_SN
+		            , A.DTA_TY_CD
+		            , A.ADIT_DTA_TY_CD
+		            , A.DETAIL_ORDR
+		            , A.DETAIL_CN
+		            , A.LANG_CD
+		            , A.SEARCH_AT
+		            , A.EXPSR_ORDR
+		            , A.REPRSNT_AT
+		            , A.ORIGIN_ID
+		            , A.DETAIL_FIELD_TY_CD
+		            , B.REPRSNT_NM
+		            , B.WRITR_NO
+		            , B.PRDCT_LCLAS_CD  AS DATA_TYCD
+		            , B.ATCH_FILE_ID
+		            , B.PRDCT_BGNDE AS BGNDE_DT
+		            , B.PRDCT_ENDDE AS ENDDE_DT
+		            , B.PRSMP_ERA_DT AS PRSMP_DT
+		            , C.RSRCHR_NM AS RSRCHR_ID
+		            , C.PSITN_NM AS PSITN_CD
+		            , C.WRITNG_DT
+		            , C.CONFM_STTUS_CD
+		            , C.REGIST_ID
+		            , C.REGIST_DT
+		        FROM TK_DETAIL A 
+		        INNER JOIN TK_PRDCT B
+		        ON A.MASTR_TABLE_SN = B.PRDCT_NO
+		        INNER JOIN TK_REQST C
+		        ON B.PRDCT_NO = C.MASTR_TABLE_SN
+		        AND C.MASTR_TABLE_CD = 'P'
+		        AND C.USE_AT = 'Y'
+		        AND C.DELETE_CD = '0'
+		        WHERE 1=1
+		        AND A.MASTR_TABLE_CD = 'P'
+		        AND A.SEARCH_AT = 'Y'
+		         ]]>
+		        <include refid="search-where" />
+		        <![CDATA[
+		        UNION
+		        SELECT 
+		            A.DETAIL_SN
+		            , A.MASTR_TABLE_CD
+		            , '작품외' AS MASTR_TABLE_NM
+		            , A.MASTR_TABLE_SN
+		            , A.DTA_TY_CD
+		            , A.ADIT_DTA_TY_CD
+		            , A.DETAIL_ORDR
+		            , A.DETAIL_CN
+		            , A.LANG_CD
+		            , A.SEARCH_AT
+		            , A.EXPSR_ORDR
+		            , A.REPRSNT_AT
+		            , A.ORIGIN_ID
+		            , A.DETAIL_FIELD_TY_CD
+		            , B.REPRSNT_NM
+		            , B.WRITR_NO
+		            , B.DTA_TY_CD AS DATA_TYCD
+		            , B.ATCH_FILE_ID
+		            , B.PRDCTN_BGNDE AS BGNDE_DT
+		            , B.PRDCTN_ENDDE AS ENDDE_DT
+		            , B.PRSMP_ERA_DT AS PRSMP_DT
+		            , C.RSRCHR_NM AS RSRCHR_ID
+		            , C.PSITN_NM AS PSITN_CD
+		            , C.WRITNG_DT
+		            , C.CONFM_STTUS_CD
+		            , C.REGIST_ID
+		            , C.REGIST_DT
+		        FROM TK_DETAIL A 
+		        INNER JOIN TK_PRDCT_ELSE B
+		        ON A.MASTR_TABLE_SN = B.PRDCT_ELSE_NO
+		        INNER JOIN TK_REQST C
+		        ON B.PRDCT_ELSE_NO = C.MASTR_TABLE_SN
+		        AND C.MASTR_TABLE_CD = 'PE'
+		        AND C.USE_AT = 'Y'
+		        AND C.DELETE_CD = '0'
+		        WHERE 1=1
+		        AND A.MASTR_TABLE_CD = 'PE'
+		        AND A.SEARCH_AT = 'Y'
+		         ]]>
+		        <include refid="search-where" />
+		        <![CDATA[
+		        UNION
+		        SELECT 
+		            A.DETAIL_SN
+		            , A.MASTR_TABLE_CD
+		            , '참고문헌' AS MASTR_TABLE_NM
+		            , A.MASTR_TABLE_SN
+		            , A.DTA_TY_CD
+		            , A.ADIT_DTA_TY_CD
+		            , A.DETAIL_ORDR
+		            , A.DETAIL_CN
+		            , A.LANG_CD
+		            , A.SEARCH_AT
+		            , A.EXPSR_ORDR
+		            , A.REPRSNT_AT
+		            , A.ORIGIN_ID
+		            , A.DETAIL_FIELD_TY_CD
+		            , B.REPRSNT_NM
+		            , B.WRITR_NO
+		            , B.ADIT_DTA_TY_CD AS DATA_TYCD
+		            , B.ATCH_FILE_ID
+		            , NULL AS BGNDE_DT
+		            , NULL AS ENDDE_DT
+		            , B.PRDCTN_ERA_DT AS PRSMP_DT
+		            , C.RSRCHR_NM AS RSRCHR_ID
+		            , C.PSITN_NM AS PSITN_CD
+		            , C.WRITNG_DT
+		            , C.CONFM_STTUS_CD
+		            , C.REGIST_ID
+		            , C.REGIST_DT
+		        FROM TK_DETAIL A 
+		        INNER JOIN TK_REFER_LTRTRE B
+		        ON A.MASTR_TABLE_SN = B.REFER_LTRTRE_NO
+		        INNER JOIN TK_REQST C
+		        ON B.REFER_LTRTRE_NO = C.MASTR_TABLE_SN
+		        AND C.MASTR_TABLE_CD = 'RL'
+		        AND C.USE_AT = 'Y'
+		        AND C.DELETE_CD = '0'
+		        WHERE 1=1
+		        AND A.MASTR_TABLE_CD = 'RL'
+		        AND A.SEARCH_AT = 'Y'
+		         ]]>
+		        <include refid="search-where" />
+		        <![CDATA[
+		        UNION
+		        SELECT 
+		            A.DETAIL_SN
+		            , A.MASTR_TABLE_CD
+		            , '전시이력' AS MASTR_TABLE_NM
+		            , A.MASTR_TABLE_SN
+		            , A.DTA_TY_CD
+		            , A.ADIT_DTA_TY_CD
+		            , A.DETAIL_ORDR
+		            , A.DETAIL_CN
+		            , A.LANG_CD
+		            , A.SEARCH_AT
+		            , A.EXPSR_ORDR
+		            , A.REPRSNT_AT
+		            , A.ORIGIN_ID
+		            , A.DETAIL_FIELD_TY_CD
+		            , B.REPRSNT_NM
+		            , B.WRITR_NO
+		            , B.EXBI_TY_CD AS DATA_TYCD
+		            , B.ATCH_FILE_ID
+		            , B.EXBI_BGNDE AS BGNDE_DT
+		            , B.EXBI_ENDDE AS ENDDE_DT
+		            , B.PRSMP_ERA_DT AS PRSMP_DT
+		            , C.RSRCHR_NM AS RSRCHR_ID
+		            , C.PSITN_NM AS PSITN_CD
+		            , C.WRITNG_DT
+		            , C.CONFM_STTUS_CD
+		            , C.REGIST_ID
+		            , C.REGIST_DT
+		        FROM TK_DETAIL A 
+		        INNER JOIN TK_EXBI B
+		        ON A.MASTR_TABLE_SN = B.EXBI_NO
+		        INNER JOIN TK_REQST C
+		        ON B.EXBI_NO = C.MASTR_TABLE_SN
+		        AND C.MASTR_TABLE_CD = 'E'
+		        AND C.USE_AT = 'Y'
+		        AND C.DELETE_CD = '0'
+		        WHERE 1=1
+		        AND A.MASTR_TABLE_CD = 'E'
+		        AND A.SEARCH_AT = 'Y'
+		         ]]>
+		        <include refid="search-where" />
+		        <![CDATA[
+		        UNION
+		        SELECT 
+		            A.DETAIL_SN
+		            , A.MASTR_TABLE_CD
+		            , '작가연보' AS MASTR_TABLE_NM
+		            , A.MASTR_TABLE_SN
+		            , A.DTA_TY_CD
+		            , A.ADIT_DTA_TY_CD
+		            , A.DETAIL_ORDR
+		            , A.DETAIL_CN
+		            , A.LANG_CD
+		            , A.SEARCH_AT
+		            , A.EXPSR_ORDR
+		            , A.REPRSNT_AT
+		            , A.ORIGIN_ID
+		            , A.DETAIL_FIELD_TY_CD
+		            , B.REPRSNT_NM
+		            , B.WRITR_NO
+		            , B.ANLRPT_TY_CD AS DATA_TYCD
+		            , B.ATCH_FILE_ID
+		            , B.ANLRPT_BGNDE AS BGNDE_DT
+		            , B.ANLRPT_ENDDE AS ENDDE_DT
+		            , B.PRSMP_ERA_DT AS PRSMP_DT
+		            , C.RSRCHR_NM AS RSRCHR_ID
+		            , C.PSITN_NM AS PSITN_CD
+		            , C.WRITNG_DT
+		            , C.CONFM_STTUS_CD
+		            , C.REGIST_ID
+		            , C.REGIST_DT
+		        FROM TK_DETAIL A 
+		        INNER JOIN TK_ANLRPT B
+		        ON A.MASTR_TABLE_SN = B.ANLRPT_NO
+		        INNER JOIN TK_REQST C
+		        ON B.ANLRPT_NO = C.MASTR_TABLE_SN
+		        AND C.MASTR_TABLE_CD = 'A'
+		        AND C.USE_AT = 'Y'
+		        AND C.DELETE_CD = '0'
+		        WHERE 1=1
+		        AND A.MASTR_TABLE_CD = 'A'
+		        AND A.SEARCH_AT = 'Y'
+		         ]]>
+		        <include refid="search-where" />
+		        <![CDATA[
+		        UNION
+		        SELECT 
+		            A.DETAIL_SN
+		            , A.MASTR_TABLE_CD
+		            , '인용문' AS MASTR_TABLE_NM
+		            , A.MASTR_TABLE_SN
+		            , A.DTA_TY_CD
+		            , A.ADIT_DTA_TY_CD
+		            , A.DETAIL_ORDR
+		            , A.DETAIL_CN
+		            , A.LANG_CD
+		            , A.SEARCH_AT
+		            , A.EXPSR_ORDR
+		            , A.REPRSNT_AT
+		            , A.ORIGIN_ID
+		            , A.DETAIL_FIELD_TY_CD
+		            , B.REPRSNT_NM
+		            , B.WRITR_NO
+		            , B.QOTAT_TY_CD AS DATA_TYCD
+		            , B.ATCH_FILE_ID
+		            , B.QOTAT_BGNDE AS BGNDE_DT
+		            , B.QOTAT_ENDDE AS ENDDE_DT
+		            , B.PRSMP_ERA_DT AS PRSMP_DT
+		            , C.RSRCHR_NM AS RSRCHR_ID
+		            , C.PSITN_NM AS PSITN_CD
+		            , C.WRITNG_DT
+		            , C.CONFM_STTUS_CD
+		            , C.REGIST_ID
+		            , C.REGIST_DT
+		        FROM TK_DETAIL A 
+		        INNER JOIN TK_QOTAT B
+		        ON A.MASTR_TABLE_SN = B.QOTAT_NO
+		        INNER JOIN TK_REQST C
+		        ON B.QOTAT_NO = C.MASTR_TABLE_SN
+		        AND C.MASTR_TABLE_CD = 'Q'
+		        AND C.USE_AT = 'Y'
+		        AND C.DELETE_CD = '0'
+		        WHERE 1=1
+		        AND A.MASTR_TABLE_CD = 'Q'
+		        AND A.SEARCH_AT = 'Y'
+		         ]]>
+		        <include refid="search-where" />
+		        <![CDATA[
+		    )
+		     ]]>
+		        <include refid="order-where" />
+		<![CDATA[
+		)
+		SELECT 
+		    A.*    
+		    , F_CMMN_CD_NM(DECODE(A.MASTR_TABLE_CD,'P','PRDCT_TY_CD','PE','PRDCT_ELSE_TY_CD','RL','ADIT_DTA_TY_CD','E','EXBI_TY_CD','A','ANLRPT_TY_CD','Q','QOTAT_TY_CD',NULL),A.DATA_TYCD) AS DATA_TYNM
+		    , (SELECT DEPT_KOR_NM FROM TM_DEPT_INFO WHERE DEPT_ID = A.PSITN_CD) AS PSITN_MN
+		    , (SELECT USER_NM FROM TM_MNGR_INFO WHERE USER_ID = A.RSRCHR_ID) AS RSRCHR_NM
+		    , FN_DATE_SORT(NVL(NVL(A.BGNDE_DT,A.ENDDE_DT),A.PRSMP_DT)) AS PRSMP_YEAR
+		    , DECODE(A.CONFM_STTUS_CD,'I','최초입력','U','수정중','A','승인중','R','반려','RA','재승인중','C','승인완료','불명') AS CONFM_STTUS_NM
+	        , (
+	            SELECT COUNT(*) COUNT
+	            FROM TK_ORIGIN A1
+	            INNER JOIN TK_DETAIL B1
+	            ON A1.DETAIL_SN = B1.DETAIL_SN
+	            INNER JOIN TK_REQST C1
+	            ON B1.MASTR_TABLE_CD = C1.MASTR_TABLE_CD
+	            AND B1.MASTR_TABLE_SN = C1.MASTR_TABLE_SN
+	            AND C1.USE_AT = 'Y'
+	            AND C1.DELETE_CD = '0'
+	            WHERE 1=1
+	            AND A1.ORIGIN_ID = A.ORIGIN_ID
+	        ) AS ORIGIN_COUNT
+		FROM (
+		    SELECT 
+		        ROWNUM RNUM, ALL_LIST.* 
+		    FROM T_TEMP ALL_LIST
+		) A
+		WHERE  A.RNUM  > #{firstIndex}
+		  AND  A.RNUM <= #{firstIndex} + #{recordCountPerPage}
+		]]>
+	</select>
+	
+	<select id="findAllOriginLinkList" parameterType="zvl" resultType="zvl">
+		<![CDATA[
+		/*findAllOriginLinkList*/
+		/*출처 연결 리스트 */
+		SELECT 
+			A.DETAIL_SN
+			, A.MASTR_COLUMN_NM
+			, B.MASTR_TABLE_CD
+			, DECODE(B.MASTR_TABLE_CD,'P','작품','PE','작품외','RL','참고문헌','E','전시이력','A','작가연보','Q','인용문',NULL) AS MASTR_TABLE_NM
+			, B.MASTR_TABLE_SN
+			, B.DTA_TY_CD
+			, B.ADIT_DTA_TY_CD
+			, B.DETAIL_ORDR
+			, B.DETAIL_CN
+			, B.LANG_CD
+			, B.SEARCH_AT
+			, B.EXPSR_ORDR
+			, B.REPRSNT_AT
+			, B.ORIGIN_ID
+			, B.DETAIL_FIELD_TY_CD
+			, B.REPRSNT_NM
+			, C.PSITN_NM AS PSITN_CD
+			, (SELECT DEPT_KOR_NM FROM TM_DEPT_INFO WHERE DEPT_ID = C.PSITN_NM) AS PSITN_MN
+			, C.RSRCHR_NM AS RSRCHR_ID
+			, (SELECT USER_NM FROM TM_MNGR_INFO WHERE USER_ID = C.RSRCHR_NM) AS RSRCHR_NM
+			, C.WRITNG_DT
+			, C.CONFM_STTUS_CD
+			, DECODE(C.CONFM_STTUS_CD,'I','최초입력','U','수정중','A','승인중','R','반려','RA','재승인중','C','승인완료','불명') AS CONFM_STTUS_NM
+			, C.REGIST_ID
+			, C.REGIST_DT
+		FROM TK_ORIGIN A 
+		INNER JOIN TK_DETAIL B
+		ON A.DETAIL_SN = B.DETAIL_SN
+		INNER JOIN TK_REQST C
+		ON B.MASTR_TABLE_CD = C.MASTR_TABLE_CD
+		AND B.MASTR_TABLE_SN = C.MASTR_TABLE_SN
+		AND C.USE_AT = 'Y'
+		AND C.DELETE_CD = '0'
+		WHERE 1=1
+		AND A.ORIGIN_ID = #{originId}
+		ORDER BY A.MASTR_COLUMN_NM, DECODE(B.MASTR_TABLE_CD,'P',1,'PE',2,'RL',3,'E',4,'Q',5), C.PSITN_NM, C.RSRCHR_NM, B.DETAIL_SN
+		]]>
+	</select>
+	
+	<select id="findAllOriginListExcel" parameterType="zvl" resultType="zvl">
+		
+	</select>
+</mapper>
